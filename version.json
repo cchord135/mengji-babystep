@@ -1,6 +1,6 @@
 {
-  "version": "1.0.2",
-  "changelog": "将使用说明和检查更新移到了合适的位置",
+  "version": "1.0.3",
+  "changelog": "更新了检查更新和使用说明按钮，同时将仓库名称和项目的英文名称正式改为babysteps",
   "download_url": "https://wwbjb.lanzn.com/b0188mimfg",
   "download_password": "gh86"
 }
