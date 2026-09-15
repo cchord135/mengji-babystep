@@ -1,6 +1,6 @@
 {
-  "version": "1.0.7",
-  "changelog": "支持读取iPhone/iPad HEIC照片的拍摄时间",
+  "version": "1.0.6",
+  "changelog": "修正了更新提示弹窗",
   "download_url": "https://wwbjb.lanzn.com/b0188mimfg",
   "download_password": "gh86"
 }
