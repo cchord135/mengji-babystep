@@ -111,7 +111,7 @@ def get_mtime_date(path: str):
 # ------------------------- 版本更新检查 -------------------------
 # 每发一个新版本, 记得同步改这里的号(跟 GitHub 仓库里 version.json 的 "version" 保持对应逻辑:
 # version.json 里永远填"最新已发布版本", 这里填"这份代码/这个exe自己的版本")
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 
 # 按顺序尝试, 前面的失败了(超时/被墙/网络问题)就换下一个, 都失败才算检查失败
 UPDATE_CHECK_URLS = [
@@ -509,16 +509,19 @@ UI_STRINGS = {
         'btn_organize': '② 开始整理(正式复制文件)',
         'btn_help': '📖 使用说明',
         'btn_check_update': '🔄 检查更新',
+        'btn_check_update_highlight': '🔥 发现新版本! 点击更新',
         'update_checking_title': '检查更新',
         'update_check_fail': '无法连接到更新服务器, 请检查网络后重试。',
-        'update_found_title': '发现新版本',
+        'update_found_title': '🎉 发现新版本',
         'update_found_msg': '当前版本: v{current}\n最新版本: v{latest}\n\n更新内容:\n{changelog}',
-        'update_found_pwd_note': '\n\n(点"前往下载"后, 提取密码 {pwd} 会自动复制到剪贴板)',
-        'btn_update_download': '前往下载',
+        'update_found_pwd_note': '🔑 解压密码: {pwd}\n点击下方"前往下载"后, 密码会自动复制到剪贴板, 解压时直接粘贴(Ctrl+V)即可',
+        'btn_update_download': '⬇ 前往下载',
         'btn_update_skip': '跳过此版本',
         'btn_update_later': '下次再说',
         'update_is_latest': '当前已是最新版本(v{current})。',
         'update_open_fail': '无法自动打开下载链接, 请手动复制地址在浏览器打开:\n{url}',
+        'pwd_copied_title': '密码已复制',
+        'pwd_copied_msg': '✅ 解压密码 {pwd} 已经复制到剪贴板了\n\n接下来会为你打开下载页面, 下载完成后解压时直接粘贴(Ctrl+V)这个密码即可。',
         'result_label': '处理结果(双击某一行可预览缩略图 / 查看文件信息):',
         'col_filename': '文件名',
         'col_result': '识别结果',
@@ -604,16 +607,19 @@ UI_STRINGS = {
         'btn_organize': '2. Start Organising (copies files)',
         'btn_help': '📖 User Guide',
         'btn_check_update': '🔄 Check for Updates',
+        'btn_check_update_highlight': '🔥 Update Available! Click Here',
         'update_checking_title': 'Check for Updates',
         'update_check_fail': 'Could not reach the update server. Please check your network and try again.',
-        'update_found_title': 'New Version Available',
+        'update_found_title': '🎉 New Version Available',
         'update_found_msg': 'Current version: v{current}\nLatest version: v{latest}\n\nChangelog:\n{changelog}',
-        'update_found_pwd_note': '\n\n(Clicking "Go to Download" will copy the extraction password {pwd} to your clipboard)',
-        'btn_update_download': 'Go to Download',
+        'update_found_pwd_note': '🔑 Extraction password: {pwd}\nClicking "Go to Download" below will copy it to your clipboard — just paste (Ctrl+V) when prompted.',
+        'btn_update_download': '⬇ Go to Download',
         'btn_update_skip': 'Skip This Version',
         'btn_update_later': 'Remind Me Later',
         'update_is_latest': 'You already have the latest version (v{current}).',
         'update_open_fail': 'Could not open the download link automatically. Please copy it into your browser:\n{url}',
+        'pwd_copied_title': 'Password Copied',
+        'pwd_copied_msg': '✅ The extraction password {pwd} has been copied to your clipboard.\n\nThe download page will open next — just paste (Ctrl+V) it when you extract the file.',
         'result_label': 'Results (double-click a row for a thumbnail / file info):',
         'col_filename': 'Filename',
         'col_result': 'Result',
@@ -1227,10 +1233,19 @@ class App:
             font=('Segoe UI', 10, 'bold'), bg='#4a86e8', fg='white',
             activebackground='#3a6fc4', activeforeground='white',
             relief='flat', padx=14, pady=4, cursor='hand2')
+        self.topbar_btn_style_normal = topbar_btn_style
+        # 有新版本可更新时, "检查更新"按钮切换成这套显眼的橙红色样式, 鼓励用户点击更新
+        self.topbar_btn_style_highlight = dict(
+            font=('Segoe UI', 10, 'bold'), bg='#e64a19', fg='white',
+            activebackground='#c2340d', activeforeground='white',
+            relief='flat', padx=14, pady=4, cursor='hand2')
 
         self.lang_btn = tk.Button(lang_bar, text='', command=self.toggle_language, **topbar_btn_style)
         self.lang_btn.pack(side='right', padx=10, pady=6)
 
+        # update_available: 是否已知存在比当前更新的版本(不管是不是被用户"跳过"过),
+        # 按钮样式/文案要如实反映这个状态, 起到"鼓励更新"的作用
+        self.update_available = False
         self.btn_check_update = tk.Button(lang_bar, command=lambda: self.check_update(silent=False), **topbar_btn_style)
         self.btn_check_update.pack(side='right', padx=(0, 8), pady=6)
 
@@ -1362,7 +1377,7 @@ class App:
         self.btn_preview.config(text=S['btn_preview'])
         self.btn_organize.config(text=S['btn_organize'])
         self.btn_help.config(text=S['btn_help'])
-        self.btn_check_update.config(text=S['btn_check_update'])
+        self._refresh_update_button()
         self.lbl_result.config(text=S['result_label'])
 
         for key in self.columns_keys:
@@ -1412,6 +1427,35 @@ class App:
         tk.Button(btn_bar, text=S['close_btn'], command=top.destroy).pack(side='right')
 
     # ---------- 检查更新 ----------
+    def _refresh_update_button(self):
+        """根据 self.update_available 刷新"检查更新"按钮的文案和颜色。
+        有新版本时切换成橙红色+更醒目的文案, 起到"鼓励更新"的效果;
+        没有新版本(或还没检查过)时用回默认的蓝色样式。
+        语言切换时也会调用这个方法, 保证切换语言不会把高亮状态重置掉。"""
+        S = self.S()
+        if self.update_available:
+            self.btn_check_update.config(text=S['btn_check_update_highlight'], **self.topbar_btn_style_highlight)
+        else:
+            self.btn_check_update.config(text=S['btn_check_update'], **self.topbar_btn_style_normal)
+
+    def _center_toplevel(self, top):
+        """把弹窗定位到主窗口正中间, 而不是 Tk 默认的屏幕左上角/随机位置。
+        必须在弹窗里的内容都 pack/grid 完之后再调用, 这样 winfo_reqwidth/height
+        才能拿到弹窗实际需要的尺寸。"""
+        top.update_idletasks()
+        w = top.winfo_reqwidth()
+        h = top.winfo_reqheight()
+        try:
+            rx, ry = self.root.winfo_rootx(), self.root.winfo_rooty()
+            rw, rh = self.root.winfo_width(), self.root.winfo_height()
+            x = rx + max((rw - w) // 2, 0)
+            y = ry + max((rh - h) // 2, 0)
+        except Exception:
+            sw, sh = top.winfo_screenwidth(), top.winfo_screenheight()
+            x = max((sw - w) // 2, 0)
+            y = max((sh - h) // 2, 0)
+        top.geometry(f"+{x}+{y}")
+
     def check_update(self, silent=True):
         """silent=True(启动时自动检查): 查不到/没更新都不打扰用户, 只有发现新版本才弹窗。
         silent=False(用户手动点按钮): 无论查到什么结果都给个反馈, 包括"已是最新"和"查不到"。"""
@@ -1424,14 +1468,21 @@ class App:
         S = self.S()
         if not info:
             if not silent:
-                messagebox.showwarning(S['update_checking_title'], S['update_check_fail'])
+                messagebox.showwarning(S['update_checking_title'], S['update_check_fail'], parent=self.root)
             return
 
         latest = str(info.get('version', ''))
         if _version_tuple(latest) <= _version_tuple(APP_VERSION):
+            self.update_available = False
+            self._refresh_update_button()
             if not silent:
-                messagebox.showinfo(S['update_checking_title'], S['update_is_latest'].format(current=APP_VERSION))
+                messagebox.showinfo(S['update_checking_title'], S['update_is_latest'].format(current=APP_VERSION), parent=self.root)
             return
+
+        # 只要确认存在比当前更新的版本, 就让"检查更新"按钮亮起来提醒用户,
+        # 这个跟下面的弹窗是否要打扰用户是两码事(哪怕用户跳过了这个版本, 按钮也照样提醒着)
+        self.update_available = True
+        self._refresh_update_button()
 
         # 用户之前手动"跳过"过这个版本号的话, 静默的自动检查(启动时那次)就不再打扰他了;
         # 但如果是用户自己手动点了"检查更新"按钮, 说明他就是想看看, 哪怕跳过了也照样弹一次。
@@ -1441,7 +1492,9 @@ class App:
         self._show_update_dialog(info, latest)
 
     def _show_update_dialog(self, info, latest):
-        """自定义弹窗(而不是简单的 是/否): 下载 / 跳过此版本 / 下次再说, 三选一, 由用户自己决定。"""
+        """自定义弹窗(而不是简单的 是/否): 下载 / 跳过此版本 / 下次再说, 三选一, 由用户自己决定。
+        弹在主窗口正中间(而不是屏幕左上角), 密码提示单独用一个醒目的色块框出来,
+        避免像之前那样混在一大段文字里被用户忽略掉。"""
         S = self.S()
         changelog = info.get('changelog', '')
         url = info.get('download_url', '')
@@ -1453,21 +1506,37 @@ class App:
         top.transient(self.root)
         top.grab_set()
 
+        tk.Label(top, text=S['update_found_title'], font=('Segoe UI', 13, 'bold'),
+                 fg='#2a5db0', padx=20, pady=(18, 6)).pack()
+
         body = S['update_found_msg'].format(current=APP_VERSION, latest=latest, changelog=changelog)
+        tk.Label(top, text=body, justify='left', wraplength=440, padx=20, pady=4).pack()
+
         if pwd:
-            body += S['update_found_pwd_note'].format(pwd=pwd)
-        tk.Label(top, text=body, justify='left', wraplength=440, padx=20, pady=16).pack()
+            # 密码提示单独放一个显眼的浅黄色警示框, 而不是接在正文后面的小字里,
+            # 这是之前最容易被用户看漏的地方
+            pwd_frm = tk.Frame(top, bg='#fff3cd', highlightbackground='#ffca28',
+                                highlightthickness=1, bd=0)
+            pwd_frm.pack(fill='x', padx=20, pady=(10, 4))
+            tk.Label(pwd_frm, text=S['update_found_pwd_note'].format(pwd=pwd),
+                     justify='left', wraplength=400, bg='#fff3cd', fg='#7a4b00',
+                     font=('Segoe UI', 10, 'bold'), padx=12, pady=10).pack()
 
         def do_download():
             if pwd:
                 self.root.clipboard_clear()
                 self.root.clipboard_append(pwd)
+                self.root.update()  # 确保弹窗关闭、程序切走焦点后剪贴板内容依然保留
+            top.destroy()
+            # 密码复制是这个流程里最重要也最容易被忽略的一步, 单独用一个弹窗明确告诉用户
+            # "已经复制好了", 而不是指望用户自己注意到上面那行小字
+            if pwd:
+                messagebox.showinfo(S['pwd_copied_title'], S['pwd_copied_msg'].format(pwd=pwd), parent=self.root)
             if url:
                 try:
                     webbrowser.open(url)
                 except Exception:
-                    messagebox.showinfo(S['update_checking_title'], S['update_open_fail'].format(url=url))
-            top.destroy()
+                    messagebox.showinfo(S['update_checking_title'], S['update_open_fail'].format(url=url), parent=self.root)
 
         def do_skip():
             global CONFIG
@@ -1483,12 +1552,15 @@ class App:
             top.destroy()
 
         btn_bar = tk.Frame(top)
-        btn_bar.pack(pady=(0, 16))
-        tk.Button(btn_bar, text=S['btn_update_download'], width=14, command=do_download).pack(side='left', padx=6)
+        btn_bar.pack(pady=(12, 18))
+        tk.Button(btn_bar, text=S['btn_update_download'], width=16, font=('Segoe UI', 10, 'bold'),
+                  bg='#e64a19', fg='white', activebackground='#c2340d', activeforeground='white',
+                  relief='flat', cursor='hand2', command=do_download).pack(side='left', padx=6)
         tk.Button(btn_bar, text=S['btn_update_skip'], width=14, command=do_skip).pack(side='left', padx=6)
         tk.Button(btn_bar, text=S['btn_update_later'], width=14, command=do_later).pack(side='left', padx=6)
 
         top.protocol("WM_DELETE_WINDOW", do_later)
+        self._center_toplevel(top)
 
     def copy_ai_prompt(self):
         S = self.S()
