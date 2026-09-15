@@ -111,7 +111,7 @@ def get_mtime_date(path: str):
 # ------------------------- 版本更新检查 -------------------------
 # 每发一个新版本, 记得同步改这里的号(跟 GitHub 仓库里 version.json 的 "version" 保持对应逻辑:
 # version.json 里永远填"最新已发布版本", 这里填"这份代码/这个exe自己的版本")
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 
 # 按顺序尝试, 前面的失败了(超时/被墙/网络问题)就换下一个, 都失败才算检查失败
 UPDATE_CHECK_URLS = [
@@ -1217,14 +1217,28 @@ class App:
         self.lang = 'zh'
         self.row_paths = {}
 
-        # ---- 语言切换条(放在最顶端, 加粗+专属背景色, 保证第一眼就能看到) ----
+        # ---- 顶部工具条(放在最顶端, 专属背景色, 保证第一眼就能看到): 从左到右依次是
+        # "使用说明" / "检查更新" 这两个次要功能按钮, 最右边是最重要的语言切换按钮 ----
         lang_bar = tk.Frame(root, bg='#e8f0fe')
         lang_bar.pack(fill='x', side='top')
+
         self.lang_btn = tk.Button(
             lang_bar, text='', font=('Segoe UI', 10, 'bold'),
             bg='#4a86e8', fg='white', activebackground='#3a6fc4', activeforeground='white',
-            relief='flat', padx=14, pady=4, command=self.toggle_language)
+            relief='flat', padx=14, pady=4, cursor='hand2', command=self.toggle_language)
         self.lang_btn.pack(side='right', padx=10, pady=6)
+
+        topbar_btn_style = dict(
+            font=('Segoe UI', 9), bg='#e8f0fe', fg='#3a6fc4',
+            activebackground='#d5e3fb', activeforeground='#2a5db0',
+            relief='flat', bd=0, padx=10, pady=4, cursor='hand2',
+            highlightthickness=1, highlightbackground='#b9cdf2', highlightcolor='#b9cdf2')
+
+        self.btn_check_update = tk.Button(lang_bar, command=lambda: self.check_update(silent=False), **topbar_btn_style)
+        self.btn_check_update.pack(side='right', padx=(0, 8), pady=6)
+
+        self.btn_help = tk.Button(lang_bar, command=self.show_help, **topbar_btn_style)
+        self.btn_help.pack(side='right', padx=(0, 6), pady=6)
 
         top = tk.Frame(root)
         top.pack(fill='x', padx=10, pady=8)
@@ -1274,15 +1288,11 @@ class App:
         self.lbl_dep.pack(anchor='w', padx=12)
 
         btn_frm = tk.Frame(root)
-        btn_frm.pack(fill='x', padx=10, pady=5)
+        btn_frm.pack(pady=8)
         self.btn_preview = tk.Button(btn_frm, width=28, command=lambda: self.start(dry_run=True))
-        self.btn_preview.pack(side='left', padx=5)
+        self.btn_preview.pack(side='left', padx=8)
         self.btn_organize = tk.Button(btn_frm, width=28, command=lambda: self.start(dry_run=False))
-        self.btn_organize.pack(side='left', padx=5)
-        self.btn_help = tk.Button(btn_frm, width=16, command=self.show_help)
-        self.btn_help.pack(side='left', padx=15)
-        self.btn_check_update = tk.Button(btn_frm, width=16, command=lambda: self.check_update(silent=False))
-        self.btn_check_update.pack(side='left', padx=5)
+        self.btn_organize.pack(side='left', padx=8)
 
         self.lbl_result = tk.Label(root)
         self.lbl_result.pack(anchor='w', padx=10, pady=(8, 0))
