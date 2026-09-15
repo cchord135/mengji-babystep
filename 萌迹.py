@@ -125,7 +125,7 @@ def get_mtime_date(path: str):
 # ------------------------- 版本更新检查 -------------------------
 # 每发一个新版本, 记得同步改这里的号(跟 GitHub 仓库里 version.json 的 "version" 保持对应逻辑:
 # version.json 里永远填"最新已发布版本", 这里填"这份代码/这个exe自己的版本")
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 
 # 按顺序尝试, 前面的失败了(超时/被墙/网络问题)就换下一个, 都失败才算检查失败
 UPDATE_CHECK_URLS = [
@@ -525,7 +525,6 @@ UI_STRINGS = {
         'btn_organize': '② 开始整理(正式复制文件)',
         'btn_help': '📖 使用说明',
         'btn_check_update': '🔄 检查更新',
-        'btn_check_update_highlight': '🔥 发现新版本! 点击更新',
         'update_checking_title': '检查更新',
         'update_check_fail': '无法连接到更新服务器, 请检查网络后重试。',
         'update_found_title': '🎉 发现新版本',
@@ -625,7 +624,6 @@ UI_STRINGS = {
         'btn_organize': '2. Start Organising (copies files)',
         'btn_help': '📖 User Guide',
         'btn_check_update': '🔄 Check for Updates',
-        'btn_check_update_highlight': '🔥 Update Available! Click Here',
         'update_checking_title': 'Check for Updates',
         'update_check_fail': 'Could not reach the update server. Please check your network and try again.',
         'update_found_title': '🎉 New Version Available',
@@ -1251,19 +1249,10 @@ class App:
             font=('Segoe UI', 10, 'bold'), bg='#4a86e8', fg='white',
             activebackground='#3a6fc4', activeforeground='white',
             relief='flat', padx=14, pady=4, cursor='hand2')
-        self.topbar_btn_style_normal = topbar_btn_style
-        # 有新版本可更新时, "检查更新"按钮切换成这套显眼的橙红色样式, 鼓励用户点击更新
-        self.topbar_btn_style_highlight = dict(
-            font=('Segoe UI', 10, 'bold'), bg='#e64a19', fg='white',
-            activebackground='#c2340d', activeforeground='white',
-            relief='flat', padx=14, pady=4, cursor='hand2')
 
         self.lang_btn = tk.Button(lang_bar, text='', command=self.toggle_language, **topbar_btn_style)
         self.lang_btn.pack(side='right', padx=10, pady=6)
 
-        # update_available: 是否已知存在比当前更新的版本(不管是不是被用户"跳过"过),
-        # 按钮样式/文案要如实反映这个状态, 起到"鼓励更新"的作用
-        self.update_available = False
         self.btn_check_update = tk.Button(lang_bar, command=lambda: self.check_update(silent=False), **topbar_btn_style)
         self.btn_check_update.pack(side='right', padx=(0, 8), pady=6)
 
@@ -1397,7 +1386,7 @@ class App:
         self.btn_preview.config(text=S['btn_preview'])
         self.btn_organize.config(text=S['btn_organize'])
         self.btn_help.config(text=S['btn_help'])
-        self._refresh_update_button()
+        self.btn_check_update.config(text=S['btn_check_update'])
         self.lbl_result.config(text=S['result_label'])
 
         for key in self.columns_keys:
@@ -1447,17 +1436,6 @@ class App:
         tk.Button(btn_bar, text=S['close_btn'], command=top.destroy).pack(side='right')
 
     # ---------- 检查更新 ----------
-    def _refresh_update_button(self):
-        """根据 self.update_available 刷新"检查更新"按钮的文案和颜色。
-        有新版本时切换成橙红色+更醒目的文案, 起到"鼓励更新"的效果;
-        没有新版本(或还没检查过)时用回默认的蓝色样式。
-        语言切换时也会调用这个方法, 保证切换语言不会把高亮状态重置掉。"""
-        S = self.S()
-        if self.update_available:
-            self.btn_check_update.config(text=S['btn_check_update_highlight'], **self.topbar_btn_style_highlight)
-        else:
-            self.btn_check_update.config(text=S['btn_check_update'], **self.topbar_btn_style_normal)
-
     def _center_toplevel(self, top):
         """把弹窗定位到主窗口正中间, 而不是 Tk 默认的屏幕左上角/随机位置。
         必须在弹窗里的内容都 pack/grid 完之后再调用, 这样 winfo_reqwidth/height
@@ -1468,6 +1446,10 @@ class App:
         try:
             rx, ry = self.root.winfo_rootx(), self.root.winfo_rooty()
             rw, rh = self.root.winfo_width(), self.root.winfo_height()
+            # 主窗口尺寸小于100像素基本可以判定是"还没渲染出真实大小"(默认值/异常值),
+            # 这种情况下按它来算居中反而会把弹窗定位到奇怪的地方, 干脆退化成屏幕居中
+            if rw < 100 or rh < 100:
+                raise ValueError("root window not fully rendered yet")
             x = rx + max((rw - w) // 2, 0)
             y = ry + max((rh - h) // 2, 0)
         except Exception:
@@ -1493,16 +1475,9 @@ class App:
 
         latest = str(info.get('version', ''))
         if _version_tuple(latest) <= _version_tuple(APP_VERSION):
-            self.update_available = False
-            self._refresh_update_button()
             if not silent:
                 messagebox.showinfo(S['update_checking_title'], S['update_is_latest'].format(current=APP_VERSION), parent=self.root)
             return
-
-        # 只要确认存在比当前更新的版本, 就让"检查更新"按钮亮起来提醒用户,
-        # 这个跟下面的弹窗是否要打扰用户是两码事(哪怕用户跳过了这个版本, 按钮也照样提醒着)
-        self.update_available = True
-        self._refresh_update_button()
 
         # 用户之前手动"跳过"过这个版本号的话, 静默的自动检查(启动时那次)就不再打扰他了;
         # 但如果是用户自己手动点了"检查更新"按钮, 说明他就是想看看, 哪怕跳过了也照样弹一次。
@@ -1514,7 +1489,25 @@ class App:
     def _show_update_dialog(self, info, latest):
         """自定义弹窗(而不是简单的 是/否): 下载 / 跳过此版本 / 下次再说, 三选一, 由用户自己决定。
         弹在主窗口正中间(而不是屏幕左上角), 密码提示单独用一个醒目的色块框出来,
-        避免像之前那样混在一大段文字里被用户忽略掉。"""
+        避免像之前那样混在一大段文字里被用户忽略掉。
+
+        外面包了一层 try/except: 万一将来哪次改动漏加了某个文案 key、或者
+        changelog 里混进了什么奇怪内容导致这里出错, 也不能让用户看到一个
+        "弹出来了但没有任何内容、点了也没反应"的卡死空壳弹窗——那种体验比
+        直接不弹还糟糕。出错就把这个半成品窗口销毁掉, 退化成最朴素的
+        messagebox 提示, 好歹能让用户知道"有新版本"这件事本身。"""
+        top = None
+        try:
+            top = self._build_update_dialog(info, latest)
+        except Exception:
+            if top is not None:
+                try:
+                    top.destroy()
+                except Exception:
+                    pass
+            self._show_update_fallback(info, latest)
+
+    def _build_update_dialog(self, info, latest):
         S = self.S()
         changelog = info.get('changelog', '')
         url = info.get('download_url', '')
@@ -1527,7 +1520,7 @@ class App:
         top.grab_set()
 
         tk.Label(top, text=S['update_found_title'], font=('Segoe UI', 13, 'bold'),
-                 fg='#2a5db0', padx=20, pady=(18, 6)).pack()
+                 fg='#2a5db0', padx=20).pack(pady=(18, 6))
 
         body = S['update_found_msg'].format(current=APP_VERSION, latest=latest, changelog=changelog)
         tk.Label(top, text=body, justify='left', wraplength=440, padx=20, pady=4).pack()
@@ -1581,6 +1574,28 @@ class App:
 
         top.protocol("WM_DELETE_WINDOW", do_later)
         self._center_toplevel(top)
+        return top
+
+    def _show_update_fallback(self, info, latest):
+        """_build_update_dialog 出错时的兜底方案: 退化成最简单的 是/否 提示框,
+        没有"跳过此版本"这种精细选项, 但至少能让用户知道有新版本、能选择要不要去下载,
+        不会卡死在一个空白窗口里出不来。"""
+        S = self.S()
+        url = info.get('download_url', '')
+        pwd = info.get('download_password', '')
+        changelog = info.get('changelog', '')
+        msg = S['update_found_msg'].format(current=APP_VERSION, latest=latest, changelog=changelog)
+        if pwd:
+            msg += f"\n\n{S.get('update_found_pwd_note', '密码: {pwd}').format(pwd=pwd)}"
+        go = messagebox.askyesno(S['update_found_title'], msg, parent=self.root)
+        if go and url:
+            if pwd:
+                self.root.clipboard_clear()
+                self.root.clipboard_append(pwd)
+            try:
+                webbrowser.open(url)
+            except Exception:
+                messagebox.showinfo(S['update_checking_title'], S['update_open_fail'].format(url=url), parent=self.root)
 
     def copy_ai_prompt(self):
         S = self.S()
