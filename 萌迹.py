@@ -111,12 +111,12 @@ def get_mtime_date(path: str):
 # ------------------------- 版本更新检查 -------------------------
 # 每发一个新版本, 记得同步改这里的号(跟 GitHub 仓库里 version.json 的 "version" 保持对应逻辑:
 # version.json 里永远填"最新已发布版本", 这里填"这份代码/这个exe自己的版本")
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 
 # 按顺序尝试, 前面的失败了(超时/被墙/网络问题)就换下一个, 都失败才算检查失败
 UPDATE_CHECK_URLS = [
-    "https://cdn.jsdelivr.net/gh/cchord135/mengji-babystep@main/version.json",
-    "https://raw.githubusercontent.com/cchord135/mengji-babystep/refs/heads/main/version.json",
+    "https://cdn.jsdelivr.net/gh/cchord135/mengji-babysteps@main/version.json",
+    "https://raw.githubusercontent.com/cchord135/mengji-babysteps/refs/heads/main/version.json",
 ]
 
 
@@ -487,7 +487,7 @@ def T(key, **kwargs):
 
 UI_STRINGS = {
     'zh': {
-        'window_title': '萌迹 v2',
+        'window_title': f'萌迹 v{APP_VERSION}',
         'lang_toggle': '🌐 English',
         'src_label': '待整理文件夹:',
         'dst_label': '目标根文件夹:',
@@ -582,7 +582,7 @@ UI_STRINGS = {
         'ai_prompt': AI_PROMPT_TEMPLATE_ZH,
     },
     'en': {
-        'window_title': 'Baby Steps v2',
+        'window_title': f'Baby Steps v{APP_VERSION}',
         'lang_toggle': '🌐 中文',
         'src_label': 'Folder to sort:',
         'dst_label': 'Destination folder:',
@@ -1217,22 +1217,19 @@ class App:
         self.lang = 'zh'
         self.row_paths = {}
 
-        # ---- 顶部工具条(放在最顶端, 专属背景色, 保证第一眼就能看到): 从左到右依次是
-        # "使用说明" / "检查更新" 这两个次要功能按钮, 最右边是最重要的语言切换按钮 ----
+        # ---- 顶部工具条(放在最顶端, 专属背景色, 保证第一眼就能看到): 三个按钮统一风格
+        # (实心蓝底白字), 从左到右依次是 "使用说明" / "检查更新" 这两个次要功能按钮,
+        # 最右边是语言切换按钮 ----
         lang_bar = tk.Frame(root, bg='#e8f0fe')
         lang_bar.pack(fill='x', side='top')
 
-        self.lang_btn = tk.Button(
-            lang_bar, text='', font=('Segoe UI', 10, 'bold'),
-            bg='#4a86e8', fg='white', activebackground='#3a6fc4', activeforeground='white',
-            relief='flat', padx=14, pady=4, cursor='hand2', command=self.toggle_language)
-        self.lang_btn.pack(side='right', padx=10, pady=6)
-
         topbar_btn_style = dict(
-            font=('Segoe UI', 9), bg='#e8f0fe', fg='#3a6fc4',
-            activebackground='#d5e3fb', activeforeground='#2a5db0',
-            relief='flat', bd=0, padx=10, pady=4, cursor='hand2',
-            highlightthickness=1, highlightbackground='#b9cdf2', highlightcolor='#b9cdf2')
+            font=('Segoe UI', 10, 'bold'), bg='#4a86e8', fg='white',
+            activebackground='#3a6fc4', activeforeground='white',
+            relief='flat', padx=14, pady=4, cursor='hand2')
+
+        self.lang_btn = tk.Button(lang_bar, text='', command=self.toggle_language, **topbar_btn_style)
+        self.lang_btn.pack(side='right', padx=10, pady=6)
 
         self.btn_check_update = tk.Button(lang_bar, command=lambda: self.check_update(silent=False), **topbar_btn_style)
         self.btn_check_update.pack(side='right', padx=(0, 8), pady=6)
