@@ -18,7 +18,10 @@
     - 标准库即可跑最基础功能(不装额外库也能用, 只是没有EXIF/视频元数据校验)
     - 如果想启用"元数据交叉校验"和"缩略图预览", 需要:
         pip install pillow hachoir
-      (HEIC格式的缩略图预览可能还需要额外装 pillow-heif, 非必需)
+    - 如果照片来源包含iPhone拍摄的HEIC/HEIF格式(iOS默认拍照格式), 强烈建议额外装:
+        pip install pillow-heif
+      不装的话HEIC照片的EXIF拍摄时间读不出来, 会退化成靠文件修改时间兜底猜日期,
+      准确率明显下降; 装了之后HEIC的读取方式跟jpg完全一样, 不需要改任何操作习惯。
 
 使用方法:
     双击运行, 或命令行: python 萌迹.py
@@ -55,6 +58,17 @@ try:
     HACHOIR_AVAILABLE = True
 except ImportError:
     HACHOIR_AVAILABLE = False
+
+# Pillow本身不能直接解码HEIC/HEIF(iPhone从iOS 11起拍照默认就是这个格式),
+# 必须额外装 pillow-heif 这个插件、并调用一次 register_heif_opener() 把解码器"注册"进Pillow里,
+# 之后 Image.open() 才能像打开jpg一样打开.heic文件(含读EXIF)。不装的话.heic文件的
+# 元数据交叉校验会静默失效, 只能退化成靠文件名/文件修改时间猜日期。
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    HEIF_AVAILABLE = True
+except ImportError:
+    HEIF_AVAILABLE = False
 
 IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.heic', '.heif'}
 
@@ -111,7 +125,7 @@ def get_mtime_date(path: str):
 # ------------------------- 版本更新检查 -------------------------
 # 每发一个新版本, 记得同步改这里的号(跟 GitHub 仓库里 version.json 的 "version" 保持对应逻辑:
 # version.json 里永远填"最新已发布版本", 这里填"这份代码/这个exe自己的版本")
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 
 # 按顺序尝试, 前面的失败了(超时/被墙/网络问题)就换下一个, 都失败才算检查失败
 UPDATE_CHECK_URLS = [
@@ -501,9 +515,11 @@ UI_STRINGS = {
         'save_config': '保存配置',
         'reload_rules': '重新加载规则文件(rules.json)',
         'dep_exif': '图片EXIF校验: ',
+        'dep_heic': 'iPhone HEIC支持: ',
         'dep_video': '视频元数据校验: ',
         'dep_on': '已启用',
         'dep_off_pillow': '未启用(需 pip install pillow)',
+        'dep_off_heif': '未启用(需 pip install pillow-heif)',
         'dep_off_hachoir': '未启用(需 pip install hachoir)',
         'btn_preview': '① 预览(不复制任何文件)',
         'btn_organize': '② 开始整理(正式复制文件)',
@@ -599,9 +615,11 @@ UI_STRINGS = {
         'save_config': 'Save Settings',
         'reload_rules': 'Reload Rules File (rules.json)',
         'dep_exif': 'Photo EXIF check: ',
+        'dep_heic': 'iPhone HEIC support: ',
         'dep_video': 'Video metadata check: ',
         'dep_on': 'enabled',
         'dep_off_pillow': 'disabled (run: pip install pillow)',
+        'dep_off_heif': 'disabled (run: pip install pillow-heif)',
         'dep_off_hachoir': 'disabled (run: pip install hachoir)',
         'btn_preview': '1. Preview (copies nothing)',
         'btn_organize': '2. Start Organising (copies files)',
@@ -1372,7 +1390,9 @@ class App:
 
         dep_on_off_pil = S['dep_on'] if PIL_AVAILABLE else S['dep_off_pillow']
         dep_on_off_hachoir = S['dep_on'] if HACHOIR_AVAILABLE else S['dep_off_hachoir']
-        self.lbl_dep.config(text=f"{S['dep_exif']}{dep_on_off_pil}   |   {S['dep_video']}{dep_on_off_hachoir}")
+        dep_on_off_heif = S['dep_on'] if HEIF_AVAILABLE else S['dep_off_heif']
+        self.lbl_dep.config(text=f"{S['dep_exif']}{dep_on_off_pil}   |   {S['dep_heic']}{dep_on_off_heif}"
+                                  f"   |   {S['dep_video']}{dep_on_off_hachoir}")
 
         self.btn_preview.config(text=S['btn_preview'])
         self.btn_organize.config(text=S['btn_organize'])
