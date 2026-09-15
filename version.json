@@ -1,6 +1,6 @@
 {
-  "version": "1.0.1",
-  "changelog": "首个支持自动检查更新的版本",
+  "version": "1.0.2",
+  "changelog": "将使用说明和检查更新移到了合适的位置",
   "download_url": "https://wwbjb.lanzn.com/b0188mimfg",
   "download_password": "gh86"
 }
