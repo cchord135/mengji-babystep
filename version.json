@@ -1,6 +1,6 @@
 {
-  "version": "1.0.4",
-  "changelog": "更新了更新弹窗的位置和高亮显示",
+  "version": "1.0.5",
+  "changelog": "支持读取iPhone/iPad HEIC照片的拍摄时间",
   "download_url": "https://wwbjb.lanzn.com/b0188mimfg",
   "download_password": "gh86"
 }
